@@ -1,0 +1,17 @@
+{
+  "name": "儿科 MCQ 刷题 · PAE S1–S4",
+  "short_name": "儿科MCQ",
+  "description": "275 道儿科 MCQ，按 PAE 课件模块分类，含官方解析",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F4F7FA",
+  "theme_color": "#156082",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
