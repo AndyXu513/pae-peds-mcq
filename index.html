@@ -694,7 +694,20 @@ function initGate(){
 }
 document.addEventListener("keydown", e=>{
   if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const ae = document.activeElement;
+  if(ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable)) return;
   if(!$("#gate").classList.contains("hide")) return;
+  const jm = $("#jumpModal"), bm = $("#bkModal");
+  if((jm && !jm.classList.contains("hide")) || (bm && !bm.classList.contains("hide"))) return;
+  if(state.view === "exam"){
+    const ex = state.exam;
+    if(ex && !ex.submitted && !ex.review && /^[1-5]$/.test(e.key)){
+      const btn = document.querySelectorAll(".opt")[+e.key - 1];
+      if(btn) btn.click();
+    }
+    return;
+  }
+  if(state.view !== "quiz") return;
   const p = pool(); if(!p.length) return;
   if(/^[1-5]$/.test(e.key)){ const k = L[+e.key-1]; if(k) pick(k); }
   else if(e.key==="ArrowLeft" && state.idx>0){ state.idx--; save(); render(); }
