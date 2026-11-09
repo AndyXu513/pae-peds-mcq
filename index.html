@@ -579,7 +579,7 @@ function render(){
       ${state.cat!=="all"?`<button class="nbtn ghost" id="clearCat">清空本模块</button>`:""}
       ${rec?`<button class="nbtn ghost" id="redo">重做本题</button>`:""}
     </div>
-    <div class="kbd"><kbd>1</kbd>–<kbd>5</kbd> 选答案 · <kbd>←</kbd><kbd>→</kbd> 切题 · 选完立即出解析</div>`;
+    <div class="kbd"><kbd>←</kbd><kbd>→</kbd> 切题 · 选完立即出解析</div>`;
 
   stage.querySelectorAll(".opt").forEach(el=>{
     el.onclick = ()=>{ pick(el.dataset.k); };
@@ -699,18 +699,9 @@ document.addEventListener("keydown", e=>{
   if(!$("#gate").classList.contains("hide")) return;
   const jm = $("#jumpModal"), bm = $("#bkModal");
   if((jm && !jm.classList.contains("hide")) || (bm && !bm.classList.contains("hide"))) return;
-  if(state.view === "exam"){
-    const ex = state.exam;
-    if(ex && !ex.submitted && !ex.review && /^[1-5]$/.test(e.key)){
-      const btn = document.querySelectorAll(".opt")[+e.key - 1];
-      if(btn) btn.click();
-    }
-    return;
-  }
   if(state.view !== "quiz") return;
   const p = pool(); if(!p.length) return;
-  if(/^[1-5]$/.test(e.key)){ const k = L[+e.key-1]; if(k) pick(k); }
-  else if(e.key==="ArrowLeft" && state.idx>0){ state.idx--; save(); render(); }
+  if(e.key==="ArrowLeft" && state.idx>0){ state.idx--; save(); render(); }
   else if(e.key==="ArrowRight"){ state.idx = state.idx>=p.length-1?0:state.idx+1; save(); render(); }
 });
 
