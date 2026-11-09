@@ -599,16 +599,30 @@ function render(){
       if(!v) return;
       const pp = pool();
       let i = -1;
-      const cm = v.match(/^([a-n])\s*-?\s*(\d+)$/i);
+      const norm = v.replace(/\s+/g, "").toUpperCase();
+      const cm = norm.match(/^([A-N])-?(\d+)$/);
+      let target = null;
       if(cm){
-        const want = cm[1].toUpperCase() + (+cm[2]);
-        i = pp.findIndex(x => (x.code || "").toUpperCase() === want);
-        if(i < 0) i = DATA.questions.findIndex(x => (x.code || "").toUpperCase() === want);
+        const want = cm[1] + (+cm[2]);
+        target = DATA.questions.find(x => (x.code || "").toUpperCase() === want) || null;
       }else if(/^\d+$/.test(v)){
         const n = +v;
-        i = pp.findIndex(x => x.inMod === n);
-        if(i < 0) i = Math.min(pp.length, Math.max(1, n)) - 1;
+        const scope = DATA.questions.filter(x => state.cat === "all" || x.m === state.cat);
+        target = scope.find(x => x.inMod === n) || DATA.questions[n - 1] || null;
       }
+      if(!target){
+        jn.value = ""; jn.placeholder = "无 " + v;
+        setTimeout(() => { if(jn) jn.placeholder = "C15"; }, 1400);
+        return;
+      }
+      if(state.cat !== "all" && target.m !== state.cat) state.cat = target.m;
+      let pp2 = pool();
+      i = pp2.findIndex(x => x.id === target.id);
+      if(i < 0){ state.cat = "all"; pp2 = pool(); i = pp2.findIndex(x => x.id === target.id); }
+      state.idx = i >= 0 ? i : 0;
+      jn.value = ""; save(); render();
+      window.scrollTo({top:0, behavior:"smooth"});
+      return;
       if(i >= 0 && i < pp.length){ state.idx = i; jn.value = ""; save(); render(); }
       else { jn.value = ""; jn.placeholder = "无此题"; setTimeout(()=>{ if(jn) jn.placeholder = "题号"; }, 1200); }
     };
