@@ -173,6 +173,28 @@ section{padding:26px 30px 80px;min-width:0}
 #toast button{background:rgba(255,255,255,.16);color:#fff;padding:5px 11px;border-radius:7px;font-size:12.5px}
 #toast button:hover{background:rgba(255,255,255,.28)}
 
+/* ---------- 错题本视图 ---------- */
+.wpage-head{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.wpage-head h2{margin:0;font-size:19px;font-weight:700;letter-spacing:.2px}
+.wpage-head .wsub{font-size:12.5px;color:var(--muted)}
+.wpage-head .wact{margin-left:auto;display:flex;gap:8px}
+.wgroup{margin-top:22px}
+.wgroup-h{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.wgroup-h .wt{font-size:13.5px;font-weight:650;color:var(--teal-d)}
+.wgroup-h .wc{font-size:11.5px;color:var(--muted);background:#EBF1F6;padding:1px 8px;border-radius:99px}
+.wgroup-h .wline{flex:1;height:1px;background:var(--border)}
+.wcard{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--border);
+  border-radius:12px;padding:14px 16px;margin-bottom:9px;transition:.15s;box-shadow:0 1px 2px rgba(14,40,65,.04)}
+.wcard:hover{border-color:#BFD3E0;transform:translateY(-1px);box-shadow:0 6px 18px rgba(14,40,65,.07)}
+.wcard .wtop{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.wcard .wno{font-size:11.5px;color:#95A3B3;font-variant-numeric:tabular-nums}
+.wcard .wq{font-size:14px;line-height:1.55;color:#25384B;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden}
+.wcard .wans{display:flex;gap:14px;margin-top:9px;font-size:12px;align-items:center}
+.wcard .wans .bad{color:var(--red)}
+.wcard .wans .good{color:var(--green);font-weight:600}
+.wcard .wgo{margin-left:auto;font-size:12px;color:var(--teal);font-weight:600}
+
 /* ---------- backup modal ---------- */
 .gatebox.bk{max-width:520px;text-align:left;padding:26px 26px 22px}
 .gatebox.bk h2{margin:0 0 6px;font-size:17px;text-align:center}
@@ -209,6 +231,12 @@ section{padding:26px 30px 80px;min-width:0}
   .figure img{max-width:100%;height:auto}
   .nav{flex-wrap:wrap}
   .sesbar{padding:8px 14px 0}
+  .wcard{padding:12px 13px}
+  .wcard .wq{font-size:13.5px}
+  .wcard .wans{flex-direction:column;align-items:flex-start;gap:2px;margin-top:8px;font-size:11.5px}
+  .wcard .wans .wgo{display:none}
+  .wcard .wtop::after{content:"\203A";margin-left:auto;color:#B9CBD9;font-size:18px;line-height:1}
+  .wpage-head .wact{width:100%;margin-left:0}
 }
 </style>
 </head>
@@ -271,7 +299,7 @@ const DATA = {"modules": [{"c": "01", "t": "01 呼吸系统"}, {"c": "02", "t": 
 const KEY = "pae_mcq_v2";
 const L = ["A","B","C","D","E","F","G"];
 
-let state = {answers:{}, cat:"all", ses:"all", wrongOnly:false, idx:0};
+let state = {answers:{}, cat:"all", ses:"all", wrongOnly:false, view:"quiz", idx:0};
 try{
   const raw = localStorage.getItem(KEY);
   if(raw){ const s = JSON.parse(raw); state = Object.assign(state, s); }
@@ -299,16 +327,21 @@ function renderCats(){
   const s = stats();
   let h = `<div class="cathead">课件模块</div>`;
   const inSes = DATA.questions.filter(q=>state.ses==="all"||q.ses===state.ses);
-  const dnSes = inSes.filter(q=>state.answers[q.id]).length;
-  h += catRow("all","全部题目", dnSes, inSes.length, state.cat==="all");
+  const wm = state.view === "wrong";
+  const dnSes = wm
+    ? inSes.filter(q=>{const r=state.answers[q.id];return r&&!r.ok;}).length
+    : inSes.filter(q=>state.answers[q.id]).length;
+  h += catRow("all", wm?"全部错题":"全部题目", dnSes, wm?dnSes:inSes.length, state.cat==="all");
   DATA.modules.forEach(m=>{
     const qs = DATA.questions.filter(q=>q.m===m.c && (state.ses==="all"||q.ses===state.ses));
-    const dn = qs.filter(q=>state.answers[q.id]).length;
+    const dn = state.view === "wrong"
+      ? qs.filter(q=>{const r=state.answers[q.id];return r&&!r.ok;}).length
+      : qs.filter(q=>state.answers[q.id]).length;
     h += catRow(m.c, m.t.replace(/^\d+\s*/,""), dn, qs.length, state.cat===m.c);
   });
   box.innerHTML = h;
   box.querySelectorAll(".cat").forEach(el=>{
-    el.onclick = ()=>{ state.cat = el.dataset.c; state.idx = 0; save(); render(); };
+    el.onclick = ()=>{ state.cat = el.dataset.c; state.idx = 0; save(); render(); window.scrollTo({top:0,behavior:'smooth'}); };
   });
 }
 function catRow(code,label,dn,total,on){
@@ -342,12 +375,92 @@ function renderHeader(){
   $("#total").textContent = s.all;
   $("#acc").textContent = s.acc===null ? "—" : s.acc + "%";
   $("#fill").style.width = (s.done/s.all*100).toFixed(1) + "%";
-  $("#btnWrong").classList.toggle("on", state.wrongOnly);
+  $("#btnWrong").classList.toggle("on", state.view === "wrong");
+}
+
+function wrongItems(){
+  return DATA.questions.filter(q => {
+    const r = state.answers[q.id];
+    return r && !r.ok
+      && (state.ses === "all" || q.ses === state.ses)
+      && (state.cat === "all" || q.m === state.cat);
+  });
+}
+
+function gotoQuestion(q){
+  state.view = "quiz"; state.ses = q.ses; state.cat = q.m; state.wrongOnly = false;
+  const p = pool();
+  const i = p.findIndex(x => x.id === q.id);
+  state.idx = i < 0 ? 0 : i;
+  save(); render(); window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function renderWrong(stage){
+  const all = wrongItems();
+  const totalAll = DATA.questions.filter(q => { const r = state.answers[q.id]; return r && !r.ok; }).length;
+  if(!all.length){
+    stage.innerHTML = `<div class="wpage-head"><h2>错题本</h2>
+        <span class="wsub">${state.ses==="all"?"全部场次":"S"+state.ses}</span></div>
+      <div class="empty"><b>${totalAll?"这个筛选下没有错题 🎉":"还没有错题，继续保持 💪"}</b>
+      ${totalAll?`全部有 ${totalAll} 道错题，换个场次或模块看看。`:"往下刷题，答错的会自动收集到这里。"}</div>`;
+    return;
+  }
+  const order = DATA.modules.map(m => m.c);
+  const groups = {};
+  all.forEach(q => { (groups[q.m] = groups[q.m] || []).push(q); });
+  let h = `<div class="wpage-head"><h2>错题本</h2>
+      <span class="wsub">${all.length} 道 · ${state.ses==="all"?"全部场次":"S"+state.ses}</span>
+      <div class="wact">
+        <button class="hbtn" id="wRedoAll">逐题重刷</button>
+        <button class="hbtn danger" id="wClear">清空这批</button>
+      </div></div>`;
+
+  order.filter(c => groups[c]).forEach(code => {
+    const list = groups[code];
+    const mod = DATA.modules.find(m => m.c === code);
+    h += `<div class="wgroup"><div class="wgroup-h">
+        <span class="wt">${mod ? mod.t : code}</span><span class="wc">${list.length}</span>
+        <span class="wline"></span></div>`;
+    list.sort((a, b) => (a.ses - b.ses) || (a.no - b.no));
+    list.forEach(q => {
+      const r = state.answers[q.id];
+      const qtxt = (q.q || "").replace(/\s+/g, " ");
+      h += `<button class="wcard" data-id="${q.id}">
+        <div class="wtop"><span class="badge">S${q.ses}</span><span class="wno">原题 S${q.ses}-${q.no}</span></div>
+        <div class="wq">${esc(qtxt)}</div>
+        <div class="wans"><span class="bad">你选 ${r.pick}</span>
+          <span class="good">正确 ${esc(((q.ansText||q.ans)||"").length > 70 ? ((q.ansText||q.ans).slice(0,70)+"…") : (q.ansText||q.ans))}</span>
+          <span class="wgo">去做这题 →</span></div>
+      </button>`;
+    });
+    h += `</div>`;
+  });
+  stage.innerHTML = h;
+
+  stage.querySelectorAll(".wcard").forEach(el => {
+    el.onclick = () => {
+      const q = DATA.questions.find(x => x.id === el.dataset.id);
+      if(q) gotoQuestion(q);
+    };
+  });
+  const ra = $("#wRedoAll");
+  if(ra) ra.onclick = () => {
+    state.view = "quiz"; state.wrongOnly = true; state.idx = 0; save(); render();
+    window.scrollTo({top:0,behavior:"smooth"});
+  };
+  const wc = $("#wClear");
+  if(wc) wc.onclick = () => {
+    const snap = JSON.parse(JSON.stringify(state));
+    all.forEach(q => { delete state.answers[q.id]; });
+    save(); render();
+    toast("已清空当前筛选下的 " + all.length + " 道错题", ()=>{ state = snap; save(); render(); });
+  };
 }
 
 function render(){
   renderCats(); renderHeader(); renderSes();
   const stage = $("#stage");
+  if(state.view === "wrong"){ renderWrong(stage); return; }
   const p = pool();
   if(!p.length){
     stage.innerHTML = `<div class="empty"><b>${state.wrongOnly?"错题本是空的 🎉":"这个模块暂无题目"}</b>
@@ -439,7 +552,11 @@ function fmt(s){
   return esc(s).replace(/\b(Vignette|Question|Scenario)\s*:/gi, m=>`<em>${m}</em>`);
 }
 
-$("#btnWrong").onclick = ()=>{ state.wrongOnly = !state.wrongOnly; state.idx = 0; save(); render(); };
+$("#btnWrong").onclick = ()=>{
+  state.view = state.view === "wrong" ? "quiz" : "wrong";
+  state.wrongOnly = false; state.idx = 0; save(); render();
+  window.scrollTo({top:0,behavior:"smooth"});
+};
 
 /* ---- 一键清空（带撤销） ---- */
 let undoFn = null, undoTimer = null;
