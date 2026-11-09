@@ -129,6 +129,8 @@ section{padding:26px 30px 80px;min-width:0}
 .nbtn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
 .nbtn.primary:hover{background:var(--teal-d)}
 .nbtn.ghost{font-size:12.5px;color:var(--muted);padding:9px 12px}
+.nbtn.dash{border-style:dashed;border-color:#B7CBD8;color:var(--teal-d);font-size:13px;font-weight:600}
+.nbtn.dash:hover{background:var(--teal-l);border-color:var(--teal)}
 .kbd{font-size:11px;color:#9AAABA;margin-top:10px;letter-spacing:.02em}
 .kbd kbd{background:#EDF2F6;border-radius:4px;padding:1px 5px;font-family:inherit;font-size:10.5px;color:#5A6E82}
 
@@ -287,7 +289,8 @@ section{padding:26px 30px 80px;min-width:0}
   header{padding:10px 12px;gap:8px;flex-wrap:nowrap;min-width:0}
   .brand{display:none}
   .hbtns{width:100%;justify-content:space-between;gap:5px}
-  .hbtn{flex:1;text-align:center;padding:7px 4px;font-size:11.5px}
+  .hbtn{flex:1;text-align:center;padding:7px 2px;font-size:10.5px}
+  .nbtn.dash{font-size:12px;padding:9px 11px}
   .brand .sub,.track,.nums{display:none}
   .hbtns{gap:6px}
   .hbtn{padding:6px 10px;font-size:12px}
@@ -359,6 +362,7 @@ section{padding:26px 30px 80px;min-width:0}
     <button class="hbtn primary" id="btnExam">模拟考</button>
     <button class="hbtn" id="btnJump">跳题</button>
     <button class="hbtn" id="btnWrong">错题本</button>
+    <button class="hbtn primary" id="btnSave">保存</button>
     <button class="hbtn" id="btnBackup">备份</button>
     <button class="hbtn danger" id="btnReset">清空记录</button>
   </div>
@@ -571,6 +575,7 @@ function render(){
     <div class="nav">
       <button class="nbtn" id="prev" ${state.idx===0?"disabled":""}>← 上一题</button>
       <button class="nbtn primary" id="next">${state.idx>=p.length-1?"回到第一题":"下一题 →"}</button>
+      <button class="nbtn dash" id="nextUndone" title="跳到本模块下一道还没做的题">跳到未做</button>
       <span class="jumpwrap">
         <input id="jumpNo" type="text" inputmode="numeric" placeholder="题号" title="输题号回车直达">
         <button id="jumpGo">跳转</button>
@@ -588,6 +593,33 @@ function render(){
   $("#next").onclick = ()=>{
     state.idx = state.idx>=p.length-1 ? 0 : state.idx+1; save(); render();
     window.scrollTo({top:0,behavior:"smooth"});
+  };
+  const nu = $("#nextUndone");
+  if(nu) nu.onclick = ()=>{
+    const pp = pool();
+    if(!pp.length) return;
+    const curMod = pp[state.idx] ? pp[state.idx].m : null;
+    const start = state.idx;
+    let found = -1;
+    for(let k = start + 1; k < pp.length; k++){
+      const x = pp[k];
+      if(curMod && x.m !== curMod) continue;
+      if(!state.answers[x.id]){ found = k; break; }
+    }
+    if(found < 0){
+      for(let k = 0; k <= start; k++){
+        const x = pp[k];
+        if(curMod && x.m !== curMod) continue;
+        if(!state.answers[x.id]){ found = k; break; }
+      }
+    }
+    if(found < 0){
+      const mod = DATA.modules.find(m => m.c === curMod);
+      toast((mod ? mod.letter + " · " + mod.t.replace(/^\d+\s*/, "") : "本模块") + " 的题都做完了 🎉");
+      return;
+    }
+    state.idx = found; save(); render();
+    window.scrollTo({top:0, behavior:"smooth"});
   };
   const rd = $("#redo"); if(rd) rd.onclick = ()=>{ delete state.answers[q.id]; save(); render(); };
   const jn = $("#jumpNo"), jg = $("#jumpGo");
@@ -1054,6 +1086,27 @@ function bkRefresh(){
   $("#bkSummary").textContent = `已答 ${s.done} / ${s.all} 题 · 正确率 ${s.acc===null?"—":s.acc+"%"}`;
   $("#bkMsg").textContent = "";
 }
+$("#btnSave").onclick = async ()=>{
+  const code = bkEncode();
+  const kb = (code.length / 1024).toFixed(1);
+  try{
+    await navigator.clipboard.writeText(code);
+    toast("备份码已复制到剪贴板（" + kb + " KB），到另一台设备点「备份」粘贴即可恢复");
+  }catch(e){
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = code; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta);
+      toast("备份码已复制到剪贴板（" + kb + " KB）");
+    }catch(e2){
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([code], {type:"text/plain"}));
+      a.download = "pae-mcq-progress.txt"; a.click();
+      toast("剪贴板不可用，已下载备份文件");
+    }
+  }
+};
 $("#btnBackup").onclick = ()=>{ bkRefresh(); $("#bkModal").classList.remove("hide"); };
 $("#bkClose").onclick = ()=> $("#bkModal").classList.add("hide");
 $("#bkCopy").onclick = async ()=>{
