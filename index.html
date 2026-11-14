@@ -68,7 +68,13 @@ aside{padding:18px 12px 40px 22px;border-right:1px solid transparent;position:st
 
 /* ---------- stage ---------- */
 section{padding:26px 30px 80px;min-width:0}
-.qhead{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.wbar{display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 14px;
+    background:#fdf0e6;border:1px solid #f0cdae;border-radius:10px;font-size:13px;color:#8a4b13}
+  .wbar b{color:#c2410c}
+  .wbar button{margin-left:auto;padding:5px 12px;border-radius:8px;border:1px solid #e0b48c;
+    background:#fff;color:#8a4b13;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .wbar button:hover{background:#fdf6ef}
+  .qhead{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .badge{
   font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:6px;
   background:var(--teal-l);color:var(--teal-d);white-space:nowrap
@@ -377,7 +383,7 @@ const DATA = {"modules": [{"c": "01", "t": "01 呼吸系统", "letter": "A"}, {"
 const KEY = "pae_mcq_v3";
 const L = ["A","B","C","D","E","F","G"];
 
-let state = {answers:{}, cat:"all", ses:"all", wrongOnly:false, view:"quiz", idx:0};
+let state = {answers:{}, cat:"all", wrongOnly:false, wrongList:null, idx:0};
 try{
   const raw = localStorage.getItem(KEY);
   if(raw){ const s = JSON.parse(raw); state = Object.assign(state, s); }
@@ -387,6 +393,11 @@ const $ = s => document.querySelector(s);
 const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} };
 
 function pool(){
+  if(state.wrongList && state.wrongList.length){
+    const map = {};
+    DATA.questions.forEach(q => { map[q.id] = q; });
+    return state.wrongList.map(id => map[id]).filter(Boolean);
+  }
   let qs = DATA.questions.filter(q => state.cat==="all" || q.m===state.cat);
   if(state.wrongOnly) qs = qs.filter(q => state.answers[q.id] && !state.answers[q.id].ok);
   return qs;
@@ -418,7 +429,7 @@ function renderCats(){
   });
   box.innerHTML = h;
   box.querySelectorAll(".cat").forEach(el=>{
-    el.onclick = ()=>{ state.cat = el.dataset.c; state.idx = 0; save(); render(); window.scrollTo({top:0,behavior:'smooth'}); };
+    el.onclick = ()=>{ state.cat = el.dataset.c; state.idx = 0; state.wrongList = null; state.wrongOnly = false; save(); render(); window.scrollTo({top:0,behavior:'smooth'}); };
   });
 }
 function catRow(code,label,dn,total,on){
@@ -461,16 +472,16 @@ function renderWrong(stage){
   const totalAll = DATA.questions.filter(q => { const r = state.answers[q.id]; return r && !r.ok; }).length;
   if(!all.length){
     stage.innerHTML = `<div class="wpage-head"><h2>错题本</h2>
-        <span class="wsub"></span></div>
+        <span class="wsub">${all.length} 道错题</span></div>
       <div class="empty"><b>${totalAll?"这个筛选下没有错题 🎉":"还没有错题，继续保持 💪"}</b>
-      ${totalAll?`全部有 ${totalAll} 道错题，换个场次或模块看看。`:"往下刷题，答错的会自动收集到这里。"}</div>`;
+      ${totalAll?`全部有 ${totalAll} 道错题，换个模块看看。`:"往下刷题，答错的会自动收集到这里。"}</div>`;
     return;
   }
   const order = DATA.modules.map(m => m.c);
   const groups = {};
   all.forEach(q => { (groups[q.m] = groups[q.m] || []).push(q); });
   let h = `<div class="wpage-head"><h2>错题本</h2>
-      <span class="wsub">${all.length} 道</span>
+      <span class="wsub">${all.length} 道错题</span>
       <div class="wact">
         <button class="hbtn" id="wRedoAll">逐题重刷</button>
         <button class="hbtn danger" id="wClear">清空这批</button>
@@ -487,7 +498,7 @@ function renderWrong(stage){
       const r = state.answers[q.id];
       const qtxt = (q.q || "").replace(/\s+/g, " ");
       h += `<button class="wcard" data-id="${q.id}">
-        <div class="wtop"><span class="badge code">${q.code}</span><span class="wno">${(DATA.modules.find(m=>m.c===q.m)||{}).t||""}</span></div>
+        <div class="wtop"><span class="badge">${q.code||"?"}</span><span class="wno">${mod?mod.t:""}</span></div>
         <div class="wq">${esc(qtxt)}</div>
         <div class="wans"><span class="bad">你选 ${r.pick}</span>
           <span class="good">正确 ${esc(((q.ansText||q.ans)||"").length > 70 ? ((q.ansText||q.ans).slice(0,70)+"…") : (q.ansText||q.ans))}</span>
@@ -501,12 +512,17 @@ function renderWrong(stage){
   stage.querySelectorAll(".wcard").forEach(el => {
     el.onclick = () => {
       const q = DATA.questions.find(x => x.id === el.dataset.id);
-      if(q) gotoQuestion(q);
+      if(!q) return;
+      state.wrongList = all.map(x => x.id); state.wrongOnly = true; state.cat = "all";
+      const i = state.wrongList.indexOf(q.id);
+      state.idx = i < 0 ? 0 : i; state.view = "quiz"; save(); render();
+      window.scrollTo({top:0,behavior:"smooth"});
     };
   });
   const ra = $("#wRedoAll");
   if(ra) ra.onclick = () => {
-    state.view = "quiz"; state.wrongOnly = true; state.idx = 0; save(); render();
+    state.view = "quiz"; state.wrongOnly = true; state.cat = "all";
+    state.wrongList = all.map(q => q.id); state.idx = 0; save(); render();
     window.scrollTo({top:0,behavior:"smooth"});
   };
   const wc = $("#wClear");
@@ -556,6 +572,8 @@ function render(){
   const figs = (q.img||[]).map(src=>`<img src="${src}" alt="配图">`).join("");
 
   stage.innerHTML = `
+    ${state.wrongList?`<div class="wbar"><span>🔁 错题重刷 · 第 <b>${state.idx+1}</b> / ${p.length} 道</span>
+      <button id="exitWrong">退出重刷</button></div>`:""}
     <div class="qhead">
       <span class="badge code">${q.code}</span>
       <span class="badge">${mod?mod.t:q.m}</span>
@@ -589,6 +607,11 @@ function render(){
   stage.querySelectorAll(".opt").forEach(el=>{
     el.onclick = ()=>{ pick(el.dataset.k); };
   });
+  const ew = $("#exitWrong");
+  if(ew) ew.onclick = ()=>{
+    state.wrongList = null; state.wrongOnly = false; state.view = "wrong";
+    save(); render(); window.scrollTo({top:0,behavior:"smooth"});
+  };
   $("#prev").onclick = ()=>{ state.idx--; save(); render(); window.scrollTo({top:0,behavior:"smooth"}); };
   $("#next").onclick = ()=>{
     state.idx = state.idx>=p.length-1 ? 0 : state.idx+1; save(); render();
@@ -688,7 +711,7 @@ function fmt(s){
 
 $("#btnWrong").onclick = ()=>{
   state.view = state.view === "wrong" ? "quiz" : "wrong";
-  state.wrongOnly = false; state.idx = 0; save(); render();
+  state.wrongOnly = false; state.wrongList = null; state.idx = 0; save(); render();
   window.scrollTo({top:0,behavior:"smooth"});
 };
 
@@ -803,7 +826,7 @@ function startExam(){
   }
 
   state.exam = { ids: picked.map(q => q.id), ans: {}, i: 0, start: Date.now(), submitted: false, review: false };
-  state.view = "exam";
+  state.view = "exam"; state.wrongList = null; state.wrongOnly = false;
   save(); render(); window.scrollTo({top:0,behavior:"smooth"});
 }
 
